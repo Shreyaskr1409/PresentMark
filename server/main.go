@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Shreyaskr1409/PresentMark/middlewares"
+	"github.com/Shreyaskr1409/PresentMark/routes"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -24,6 +25,8 @@ func main() {
 	defaultRouter.UseEncodedPath()
 	defaultRouter.Use(mux.CORSMethodMiddleware(defaultRouter))
 	defaultRouter.Use(middlewares.LoggingMiddleware(l))
+
+	routes.HandleFileRoutes(l, defaultRouter)
 
 	s := &http.Server{
 		Addr:         ":9090",
