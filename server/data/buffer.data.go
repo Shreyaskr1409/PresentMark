@@ -3,10 +3,10 @@ package data
 import "time"
 
 type Buffer struct {
-	FileName      string
-	FileExtension string
-	lastModified  time.Time
-	lastAuthor    string
+	Filename      string    `json:"filename"`
+	FileExtension string    `json:"file_extension"`
+	LastModified  time.Time `json:"last_modified"`
+	LastAuthor    string    `json:"last_author"`
 }
 
 type Change struct {
