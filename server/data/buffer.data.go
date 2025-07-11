@@ -10,9 +10,9 @@ type Buffer struct {
 }
 
 type Change struct {
-	PosX      int
-	PosY      int
-	Text      string
-	Author    string
-	Timestamp time.Time
+	PosX      int       `json:"pos_x"`
+	PosY      int       `json:"pos_y"`
+	Text      string    `json:"text"`
+	Author    string    `json:"author"`
+	Timestamp time.Time `json:"timestamp"`
 }

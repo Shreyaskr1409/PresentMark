@@ -3,9 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/Shreyaskr1409/PresentMark/data"
@@ -22,7 +25,60 @@ func InitFileHandler(l *log.Logger) *FileHandler {
 	}
 }
 
-func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {}
+type GetFileRequest struct {
+	Filename string `json:"filename"`
+}
+
+func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request) {
+	var req GetFileRequest
+	err := utils.ParseRequest(r, &req)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprint("error parsing request body: ", err),
+			http.StatusBadRequest,
+		)
+		h.l.Println(err)
+		return
+	}
+
+	fp := req.Filename
+	fp = filepath.Join("public/storage/", fp)
+	fp, _ = filepath.Abs(fp)
+
+	file, err := os.Open(fp)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprint("error opening the requested file: ", err),
+			http.StatusBadRequest,
+		)
+		h.l.Println(err)
+		return
+	}
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprint("error obtaining file info: ", err),
+			http.StatusInternalServerError,
+		)
+		h.l.Println(err)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileInfo.Name())
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+
+	_, err = io.Copy(w, file)
+	if err != nil {
+		http.Error(w, "Error sending file", http.StatusInternalServerError)
+		h.l.Println(err)
+		return
+	}
+}
 
 type CreateFileRequest struct {
 	Filename string `json:"filename"`
@@ -46,9 +102,20 @@ func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request) {
 	fp, _ = filepath.Abs(fp)
 	res := data.Buffer{
 		Filename:      fp,
-		FileExtension: ".md",
+		FileExtension: filepath.Ext(fp),
 		LastModified:  time.Now(),
 		LastAuthor:    "Author (HARDCODED)",
+	}
+
+	_, err = os.Create(fp)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprint("error marshalling json for response: ", err),
+			http.StatusInternalServerError,
+		)
+		h.l.Println(err)
+		return
 	}
 
 	h.l.Println("Received request")
@@ -59,8 +126,31 @@ func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprint("error marshalling json for response: ", err),
 			http.StatusInternalServerError,
 		)
+		h.l.Println(err)
+		return
 	}
 }
 
-func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request) {}
+type UpdateFileRequest struct {
+	Filename string         `json:"filename"`
+	Changes  []*data.Change `json:"changes"`
+}
+
+func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request) {
+	var req UpdateFileRequest
+	err := utils.ParseRequest(r, &req)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprint("error parsing request body: ", err),
+			http.StatusBadRequest,
+		)
+		h.l.Println(err)
+		return
+	}
+
+	byte_arr, _ := json.MarshalIndent(req, "", "	")
+	h.l.Println(string(byte_arr))
+}
+
 func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {}
