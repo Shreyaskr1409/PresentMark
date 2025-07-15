@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Shreyaskr1409/PresentMark/data"
@@ -151,6 +153,63 @@ func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request) {
 
 	byte_arr, _ := json.MarshalIndent(req, "", "	")
 	h.l.Println(string(byte_arr))
+
+	fp := req.Filename
+	fp = filepath.Join("public/storage/", fp)
+	fp, _ = filepath.Abs(fp)
+
+	file, err := os.ReadFile(fp)
+	if err != nil {
+		h.l.Println("error opening file: ", err)
+		return
+	}
+	lines := strings.Split(string(file), "\n")
+
+	sort.Slice(req.Changes, func(i, j int) bool {
+		return req.Changes[i].Timestamp.Before(req.Changes[j].Timestamp)
+	})
+
+	for _, change := range req.Changes {
+		if len(change.Text) < 2 {
+			continue
+		}
+
+		operation := change.Text[0]
+		text := change.Text[1:]
+
+		lineNum := change.PosY
+
+		switch operation {
+		case '+':
+			if lineNum == len(lines) {
+				newLine := text
+				lines = append(lines, newLine)
+			} else {
+				currentLine := lines[lineNum]
+				if change.PosX <= len(currentLine) {
+					newLine := currentLine[:change.PosX] + text + currentLine[change.PosX:]
+					lines[change.PosY] = newLine
+				} else {
+					// If position is beyond line length, append with spaces
+					padding := strings.Repeat(" ", change.PosX-len(currentLine))
+					lines[change.PosY] = currentLine + padding + text
+				}
+			}
+		default:
+			h.l.Println("unknown operation: ", operation, "for change ", change)
+		}
+	}
+
+	newContent := strings.Join(lines, "\n")
+	err = os.WriteFile(fp, []byte(newContent), 0o644)
+	if err != nil {
+		h.l.Println("error writing file: ", err)
+		http.Error(w, "error writing file", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Changes applied successfully"))
 }
 
 func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {}
