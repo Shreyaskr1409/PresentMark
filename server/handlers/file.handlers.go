@@ -184,7 +184,7 @@ func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request) {
 			if lineNum == len(lines) {
 				newLine := text
 				lines = append(lines, newLine)
-			} else {
+			} else if lineNum < len(lines) {
 				currentLine := lines[lineNum]
 				if change.PosX <= len(currentLine) {
 					newLine := currentLine[:change.PosX] + text + currentLine[change.PosX:]
@@ -194,7 +194,40 @@ func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request) {
 					padding := strings.Repeat(" ", change.PosX-len(currentLine))
 					lines[change.PosY] = currentLine + padding + text
 				}
+			} else {
+				http.Error(w, "Invalid change request", http.StatusBadRequest)
 			}
+		case '-':
+			if lineNum >= len(lines) {
+				h.l.Println("line number out of range for deletion")
+				continue
+			}
+
+			currentLine := lines[lineNum]
+			if change.PosX > len(currentLine) {
+				h.l.Println("position beyond line length, nothing to delete")
+				continue
+			}
+
+			// Calculate deletion start position (like backspace)
+			deleteStart := change.PosX - len(text)
+			if deleteStart < 0 {
+				deleteStart = 0
+			}
+
+			// Verify each character matches what we're trying to delete
+			for i := range len(text) {
+				pos := deleteStart + i
+				if pos >= len(currentLine) || currentLine[pos] != text[i] {
+					h.l.Printf("character mismatch at position %d: expected '%c' got '%c'\n",
+						pos, text[i], data.SafeGetChar(currentLine, pos))
+					continue
+				}
+			}
+
+			// Perform the deletion
+			lines[lineNum] = currentLine[:deleteStart] + currentLine[change.PosX:]
+
 		default:
 			h.l.Println("unknown operation: ", operation, "for change ", change)
 		}

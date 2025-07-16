@@ -16,3 +16,10 @@ type Change struct {
 	Author    string    `json:"author"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+func SafeGetChar(s string, pos int) byte {
+	if pos >= 0 && pos < len(s) {
+		return s[pos]
+	}
+	return 0
+}
